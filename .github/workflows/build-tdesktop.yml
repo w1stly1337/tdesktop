@@ -1,1 +1,183 @@
+name: Build gramsrv TDesktop
 
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Prepare directories.
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV
+          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV
+
+      - name: Get repository name.
+        shell: bash
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Clone.
+        uses: actions/checkout@v7
+        with:
+          ref: 9caf32dffc90ddd9bb08ad5777b865f729fa167b
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: Apply gramsrv patch - DC options and RSA keys.
+        shell: bash
+        run: |
+          TARGET="${TBUILD}/${REPO_NAME}/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp"
+          echo "Patching ${TARGET}..."
+
+          # Replace DC IPs
+          sed -i 's/{ 1, "149\.154\.175\.50"[[:space:]]*, 443 }/{ 1, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 2, "149\.154\.167\.51"[[:space:]]*, 443 }/{ 2, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 2, "95\.161\.76\.100"[[:space:]]*, 443 }/{ }/' "${TARGET}"
+          sed -i 's/{ 3, "149\.154\.175\.100", 443 }/{ 3, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 4, "149\.154\.167\.91"[[:space:]]*, 443 }/{ 4, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 5, "149\.154\.171\.5"[[:space:]]*, 443 }/{ 5, "2.27.200.43", 2398 }/' "${TARGET}"
+
+          # Replace IPv6 DCs
+          sed -i 's/{ 1, "2001:0b28:f23d:f001:0000:0000:0000:000a", 443 }/{ 1, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 2, "2001:067c:04e8:f002:0000:0000:0000:000a", 443 }/{ 2, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 3, "2001:0b28:f23d:f003:0000:0000:0000:000a", 443 }/{ 3, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 4, "2001:067c:04e8:f004:0000:0000:0000:000a", 443 }/{ 4, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 5, "2001:0b28:f23f:f005:0000:0000:0000:000a", 443 }/{ 5, "2.27.200.43", 2398 }/' "${TARGET}"
+
+          # Replace test DCs
+          sed -i 's/{ 1, "149\.154\.175\.10"[[:space:]]*, 443 }/{ 1, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 2, "149\.154\.167\.40"[[:space:]]*, 443 }/{ 2, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 3, "149\.154\.175\.117", 443 }/{ 3, "2.27.200.43", 2398 }/' "${TARGET}"
+
+          # Replace test IPv6 DCs
+          sed -i 's/{ 1, "2001:0b28:f23d:f001:0000:0000:0000:000e", 443 }/{ 1, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 2, "2001:067c:04e8:f002:0000:0000:0000:000e", 443 }/{ 2, "2.27.200.43", 2398 }/' "${TARGET}"
+          sed -i 's/{ 3, "2001:0b28:f23d:f003:0000:0000:0000:000e", 443 }/{ 3, "2.27.200.43", 2398 }/' "${TARGET}"
+
+          # Replace RSA public keys (both test and prod)
+          cat > /tmp/gramsrv_key.txt << 'RSAKEY'
+          MIIBCgKCAQEA1J8JIDACtrn6ykiFHhJ4BQQCs32GkWjpfJOn8JVN7+gdthPi/ASU
+          FiXVwX9JBmKeZN9P2YvD9BVV/3y8QXa0no1l7iyUFfNbfbTyqaondZpZaH2/JxTA
+          RK1zZfPGKAbJaLMFUWR5vjjc4hBPXrVXb2AJ5u+RmHnDVI1aNJRKa+xe1DToaeAz
+          3aVT/0efIDqkdJ4oLUFYdjIT7HmICIuYwBX3GTOCTnmzMCWpQe8iHvhUnUR2z2of
+          jeaRIFUREV3JSFu39BPVoyGif05heaW4wVRe6r7XJa7DzN26taCp+6OsNbps8LaI
+          1skv9OyrwrAOaEb6CTMEE7BdrXSW2PPtzQIDAQAB
+          RSAKEY
+
+          # Comment out old keys and insert new gramsrv key
+          # This uses Python for reliable multi-line replacement
+          python3 -c "
+          import re
+          with open('${TARGET}', 'r') as f:
+              content = f.read()
+
+          new_key = '''-----BEGIN RSA PUBLIC KEY-----\\\\nMIIBCgKCAQEA1J8JIDACtrn6ykiFHhJ4BQQCs32GkWjpfJOn8JVN7+gdthPi/ASU\\\\nFiXVwX9JBmKeZN9P2YvD9BVV/3y8QXa0no1l7iyUFfNbfbTyqaondZpZaH2/JxTA\\\\nRK1zZfPGKAbJaLMFUWR5vjjc4hBPXrVXb2AJ5u+RmHnDVI1aNJRKa+xe1DToaeAz\\\\n3aVT/0efIDqkdJ4oLUFYdjIT7HmICIuYwBX3GTOCTnmzMCWpQe8iHvhUnUR2z2of\\\\njeaRIFUREV3JSFu39BPVoyGif05heaW4wVRe6r7XJa7DzN26taCp+6OsNbps8LaI\\\\n1skv9OyrwrAOaEb6CTMEE7BdrXSW2PPtzQIDAQAB\\\\n-----END RSA PUBLIC KEY-----'''
+
+          # Replace test public RSA keys
+          content = re.sub(
+              r'const char \*kTestPublicRSAKeys\[\].*?-----END RSA PUBLIC KEY-----\" \};',
+              'const char *kTestPublicRSAKeys[] = { \"' + new_key + '\" };',
+              content,
+              flags=re.DOTALL
+          )
+
+          # Replace prod public RSA keys
+          content = re.sub(
+              r'const char \*kPublicRSAKeys\[\].*?-----END RSA PUBLIC KEY-----\" \};',
+              'const char *kPublicRSAKeys[] = { \"' + new_key + '\" };',
+              content,
+              flags=re.DOTALL
+          )
+
+          with open('${TARGET}', 'w') as f:
+              f.write(content)
+          "
+
+          echo "Patch applied. Checking result..."
+          grep -n "2.27.200.43" "${TARGET}" | head -20
+
+      - name: First set up.
+        shell: bash
+        run: |
+          DOCPATH=$TBUILD/$REPO_NAME/docs/building-win.md
+          SDK="$(grep "SDK version" $DOCPATH | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
+          echo "SDK=$SDK" >> $GITHUB_ENV
+
+          echo "$(sha256sum $TBUILD/$REPO_NAME/Telegram/build/prepare/prepare.py | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "$SDK" >> CACHE_KEY.txt
+          echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+
+          git config --global user.email "you@example.com"
+          git config --global user.name "Sample"
+
+      - uses: Eden-CI/msvc-dev-cmd@master
+        name: Native Tools Command Prompt.
+        with:
+          arch: x64
+          sdk: ${{ env.SDK }}
+          toolset: "14.44"
+
+      - name: NuGet sources.
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: ThirdParty cache.
+        id: cache-third-party
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.TBUILD }}\ThirdParty
+          key: ${{ runner.OS }}-${{ runner.arch }}-third-party-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ runner.arch }}-third-party-
+
+      - name: Libraries cache.
+        id: cache-libs
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.LibrariesPath }}\*
+            !${{ env.LibrariesPath }}\cache_keys
+            !${{ env.LibrariesPath }}\[qQ]t[_-]*
+            ${{ env.LibrariesPath }}\cache_keys\*
+            !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
+          key: ${{ runner.OS }}-x64-libs-v2-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-x64-libs-v2-
+
+      - name: Qt cache.
+        id: cache-qt
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.LibrariesPath }}\[qQ]t[_-]*
+            ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
+          key: ${{ runner.OS }}-x64-qt6-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-x64-qt6-
+
+      - name: Libraries.
+        run: |
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
+
+      - name: Free up some disk space.
+        shell: bash
+        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+
+      - name: Build Telegram Desktop.
+        run: |
+          cd %TBUILD%\%REPO_NAME%\Telegram
+
+          call configure.bat x64 qt6 -D TDESKTOP_API_TEST=ON -D CMAKE_CONFIGURATION_TYPES=Release
+
+          cmake --build ..\out --config Release --parallel
+
+      - name: Upload artifact.
+        uses: actions/upload-artifact@v7
+        with:
+          name: gramsrv-tdesktop-win64
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out\Release\Telegram.exe
+          retention-days: 7
