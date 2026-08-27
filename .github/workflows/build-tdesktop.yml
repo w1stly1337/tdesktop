@@ -3,15 +3,16 @@ name: Build gramsrv TDesktop
 on:
   workflow_dispatch:
   push:
-    branches: [main, dev]
+    branches: [main]
 
 jobs:
   windows:
     name: Windows x64
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Prepare directories.
+        shell: cmd
         run: |
           mkdir %userprofile%\TBuild\Libraries
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
@@ -124,6 +125,7 @@ jobs:
           toolset: "14.44"
 
       - name: NuGet sources.
+        shell: cmd
         run: |
           nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
           nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
@@ -160,6 +162,7 @@ jobs:
           restore-keys: ${{ runner.OS }}-x64-qt6-
 
       - name: Libraries.
+        shell: cmd
         run: |
           %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
 
@@ -168,6 +171,7 @@ jobs:
         run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
 
       - name: Build Telegram Desktop.
+        shell: cmd
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
 
