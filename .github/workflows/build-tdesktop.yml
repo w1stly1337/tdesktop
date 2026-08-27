@@ -24,7 +24,7 @@ jobs:
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Clone.
-        uses: actions/checkout@v7
+        uses: actions/checkout@v6
         with:
           ref: 9caf32dffc90ddd9bb08ad5777b865f729fa167b
           submodules: recursive
