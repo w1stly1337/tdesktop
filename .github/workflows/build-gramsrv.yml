@@ -8,12 +8,7 @@ on:
 jobs:
   windows:
     name: Windows x64
-    runs-on: ${{ (github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/nightly') && 'depot-windows-latest-16' || 'windows-latest' }}
-
-    env:
-      UPLOAD_ARTIFACT: "true"
-      ONLY_CACHE: "false"
-      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+    runs-on: windows-latest
 
     defaults:
       run:
@@ -23,24 +18,17 @@ jobs:
       - name: Prepare directories.
         run: |
           mkdir %userprofile%\TBuild\Libraries
-          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
-          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV
-          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV
-
-      - name: Get repository name.
-        shell: bash
-        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Clone.
         uses: actions/checkout@v7
         with:
           submodules: recursive
-          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+          path: TBuild/tdesktop
 
       - name: Verify gramsrv patch applied.
         shell: bash
         run: |
-          TARGET="${TBUILD}/${REPO_NAME}/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp"
+          TARGET="TBuild/tdesktop/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp"
           echo "Checking DC options..."
           grep -c "2.27.200.43" "${TARGET}" || { echo "ERROR: Patch not applied!"; exit 1; }
           grep -c "MIIBCgKCAQEA1J8JIDACtrn6" "${TARGET}" || { echo "ERROR: RSA key not patched!"; exit 1; }
@@ -49,13 +37,10 @@ jobs:
       - name: First set up.
         shell: bash
         run: |
-          DOCPATH=$TBUILD/$REPO_NAME/docs/building-win.md
-          SDK="$(grep "SDK version" $DOCPATH | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
+          SDK="$(grep "SDK version" TBuild/tdesktop/docs/building-win.md | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
           echo "SDK=$SDK" >> $GITHUB_ENV
 
-          sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/${_Zi}//' "$PROGRAMFILES"/CMake/share/cmake*/Modules/Platform/Windows-MSVC.cmake
-
-          echo "$(sha256sum $TBUILD/$REPO_NAME/$PREPARE_PATH | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "$(sha256sum TBuild/tdesktop/Telegram/build/prepare/prepare.py | awk '{ print $1 }')" >> CACHE_KEY.txt
           echo "$SDK" >> CACHE_KEY.txt
           echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
 
@@ -78,61 +63,46 @@ jobs:
         id: cache-third-party
         uses: actions/cache@v6
         with:
-          path: ${{ env.TBUILD }}\ThirdParty
-          key: ${{ runner.OS }}-${{ runner.arch }}-third-party-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ runner.arch }}-third-party-
+          path: TBuild\ThirdParty
+          key: ${{ runner.OS }}-third-party-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-third-party-
 
       - name: Libraries cache.
         id: cache-libs
         uses: actions/cache@v6
         with:
-          path: |
-            ${{ env.LibrariesPath }}\*
-            !${{ env.LibrariesPath }}\cache_keys
-            !${{ env.LibrariesPath }}\[qQ]t[_-]*
-            ${{ env.LibrariesPath }}\cache_keys\*
-            !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-x64-libs-v2-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-x64-libs-v2-
+          path: TBuild\Libraries\win64\*
+          key: ${{ runner.OS }}-libs-v2-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-libs-v2-
 
       - name: Qt cache.
         id: cache-qt
         uses: actions/cache@v6
         with:
-          path: |
-            ${{ env.LibrariesPath }}\[qQ]t[_-]*
-            ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-x64-qt6-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-x64-qt6-
+          path: TBuild\Libraries\win64\qt6*
+          key: ${{ runner.OS }}-qt6-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-qt6-
 
       - name: Libraries.
         run: |
-          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
+          cd TBuild\tdesktop\Telegram
+          set LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64
+          call build\prepare\win.bat skip-release silent qt6
 
-      - name: Free up some disk space.
+      - name: Free up disk space.
         shell: bash
-        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+        run: find TBuild/Libraries/win64 '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
 
-      - name: Telegram Desktop build.
-        if: env.ONLY_CACHE == 'false'
+      - name: Build Telegram Desktop.
         run: |
-          cd %TBUILD%\%REPO_NAME%\Telegram
-
+          cd TBuild\tdesktop\Telegram
+          set LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64
           call configure.bat x64 qt6 -D TDESKTOP_API_TEST=ON -D CMAKE_CONFIGURATION_TYPES=Release
-
           cmake --build ..\out --config Release --parallel
 
-      - name: Move artifact.
-        if: env.UPLOAD_ARTIFACT == 'true'
-        run: |
-          set OUT=%TBUILD%\%REPO_NAME%\out\Release
-          mkdir artifact
-          move %OUT%\Telegram.exe artifact/
-
-      - uses: actions/upload-artifact@v7
-        name: Upload artifact.
-        if: env.UPLOAD_ARTIFACT == 'true'
+      - name: Upload artifact.
+        uses: actions/upload-artifact@v7
         with:
           name: gramsrv-tdesktop-win64
-          path: artifact\
+          path: TBuild\tdesktop\out\Release\Telegram.exe
           retention-days: 7
