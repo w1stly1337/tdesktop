@@ -22,7 +22,7 @@ jobs:
       - name: Clone.
         uses: actions/checkout@v7
         with:
-          ref: 9caf32dffc90ddd9bb08ad5777b865f729fa167b
+          ref: 138b937f01a275000fb2e06b3d5b864f5b78cc81
           submodules: recursive
           path: TBuild/tdesktop
 
