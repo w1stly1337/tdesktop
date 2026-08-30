@@ -129,6 +129,11 @@ jobs:
           nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
           nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
 
+      - name: Install ATL component.
+        shell: bash
+        run: |
+          "/c/Program Files (x86)/Microsoft Visual Studio/Installer/vs_installer.exe" modify --installPath "C:/Program Files/Microsoft Visual Studio/2022/Enterprise" --add Microsoft.VisualStudio.Component.VC.ATL --quiet --wait --norestart || echo "ATL install attempted"
+
       - name: Libraries.
         run: |
           cd TBuild\tdesktop\Telegram
