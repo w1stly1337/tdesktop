@@ -129,10 +129,12 @@ jobs:
           nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
           nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
 
-      - name: Install ATL component.
+      - name: Patch breakpad dump_syms (ATL not needed).
         shell: bash
         run: |
-          "/c/Program Files (x86)/Microsoft Visual Studio/Installer/vs_installer.exe" modify --installPath "C:/Program Files/Microsoft Visual Studio/2022/Enterprise" --add Microsoft.VisualStudio.Component.VC.ATL --quiet --wait --norestart || echo "ATL install attempted"
+          sed -i '/gyp dump_syms\.gyp/d' TBuild/tdesktop/Telegram/build/prepare/prepare.py
+          sed -i '/msbuild.*dump_syms\.vcxproj/d' TBuild/tdesktop/Telegram/build/prepare/prepare.py
+          echo "Patched prepare.py to skip dump_syms msbuild (needs ATL)"
 
       - name: Libraries.
         run: |
