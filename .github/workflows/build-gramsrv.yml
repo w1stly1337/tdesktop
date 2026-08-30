@@ -52,38 +52,7 @@ jobs:
       - name: Patch RSA keys to gramsrv.
         shell: bash
         run: |
-          TARGET="TBuild/tdesktop/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp"
-
-          NEW_RSA='const char *kTestPublicRSAKeys[] = { "\'
-NEW_RSA+=$'\n'"-----BEGIN RSA PUBLIC KEY-----\\n\\"
-NEW_RSA+=$'\n'"MIIBCgKCAQEA1J8JIDACtrn6ykiFHhJ4BQQCs32GkWjpfJOn8JVN7+gdthPi/ASU\\n\\"
-NEW_RSA+=$'\n'"FiXVwX9JBmKeZN9P2YvD9BVV/3y8QXa0no1l7iyUFfNbfbTyqaondZpZaH2/JxTA\\n\\"
-NEW_RSA+=$'\n'"RK1zZfPGKAbJaLMFUWR5vjjc4hBPXrVXb2AJ5u+RmHnDVI1aNJRKa+xe1DToaeAz\\n\\"
-NEW_RSA+=$'\n'"3aVT/0efIDqkdJ4oLUFYdjIT7HmICIuYwBX3GTOCTnmzMCWpQe8iHvhUnUR2z2of\\n\\"
-NEW_RSA+=$'\n'"jeaRIFUREV3JSFu39BPVoyGif05heaW4wVRe6r7XJa7DzN26taCp+6OsNbps8LaI\\n\\"
-NEW_RSA+=$'\n'"1skv9OyrwrAOaEb6CTMEE7BdrXSW2PPtzQIDAQAB\\n\\"
-NEW_RSA+=$'\n'"-----END RSA PUBLIC KEY-----" };'
-NEW_RSA+=$'\n'
-NEW_RSA+=$'\n'"const char *kPublicRSAKeys[] = { "\'
-NEW_RSA+=$'\n'"-----BEGIN RSA PUBLIC KEY-----\\n\\"
-NEW_RSA+=$'\n'"MIIBCgKCAQEA1J8JIDACtrn6ykiFHhJ4BQQCs32GkWjpfJOn8JVN7+gdthPi/ASU\\n\\"
-NEW_RSA+=$'\n'"FiXVwX9JBmKeZN9P2YvD9BVV/3y8QXa0no1l7iyUFfNbfbTyqaondZpZaH2/JxTA\\n\\"
-NEW_RSA+=$'\n'"RK1zZfPGKAbJaLMFUWR5vjjc4hBPXrVXb2AJ5u+RmHnDVI1aNJRKa+xe1DToaeAz\\n\\"
-NEW_RSA+=$'\n'"3aVT/0efIDqkdJ4oLUFYdjIT7HmICIuYwBX3GTOCTnmzMCWpQe8iHvhUnUR2z2of\\n\\"
-NEW_RSA+=$'\n'"jeaRIFUREV3JSFu39BPVoyGif05heaW4wVRe6r7XJa7DzN26taCp+6OsNbps8LaI\\n\\"
-NEW_RSA+=$'\n'"1skv9OyrwrAOaEb6CTMEE7BdrXSW2PPtzQIDAQAB\\n\\"
-NEW_RSA+=$'\n'"-----END RSA PUBLIC KEY-----" };'
-
-          awk -v newrsa="$NEW_RSA" '
-          /kTestPublicRSAKeys|kPublicRSAKeys/ { skip=1; next }
-          skip && /-----END RSA PUBLIC KEY-----/ && /;/ { skip=0; if (!done) { print newrsa; done=1 } next }
-          skip { next }
-          { print }
-          ' "$TARGET" > /tmp/patched.cpp
-
-          mv /tmp/patched.cpp "$TARGET"
-
-          echo "Verify: DC=$(grep -c '2.27.200.43' "$TARGET") RSA=$(grep -c 'MIIBCgKCAQEA1J8JIDACtrn6' "$TARGET") NS=$(grep -c '} // namespace' "$TARGET")"
+          python3 .github/patch_rsa.py "TBuild/tdesktop/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp"
 
       - name: First set up.
         shell: bash
